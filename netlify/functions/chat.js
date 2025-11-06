@@ -13,27 +13,33 @@ Services:
 - Cost Optimization
 `;
 
+// Define headers here to be reused in all responses
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*', // Allows all origins
+  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS, GET'
+};
+
 exports.handler = async (event, context) => {
 
-    const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS, GET'
-  };
+  // Handle preflight OPTIONS request
   if (event.httpMethod === 'OPTIONS') {
     return {
       statusCode: 200,
-      headers,
-      body: JSON.stringify({ message: 'CORS preflight' })
+      headers: CORS_HEADERS,
+      body: JSON.stringify({ message: 'CORS preflight successful' })
     };
   }
+
+  // Reject non-POST methods (that aren't OPTIONS)
   if (event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
-      headers,
+      headers: CORS_HEADERS, // Add headers here too
       body: JSON.stringify({ error: 'Method not allowed' })
     };
   }
+
   try {
     const body = JSON.parse(event.body || "{}");
     const message = body.message;
@@ -41,6 +47,7 @@ exports.handler = async (event, context) => {
     if (!message) {
       return {
         statusCode: 400,
+        headers: CORS_HEADERS, // Add headers to error responses
         body: JSON.stringify({ error: "message is required" }),
       };
     }
@@ -73,20 +80,36 @@ exports.handler = async (event, context) => {
       body: JSON.stringify(payload)
     });
 
+    if (!response.ok) {
+        // Handle API errors
+        const errorData = await response.json();
+        console.error("Groq API Error:", errorData);
+        return {
+            statusCode: response.status,
+            headers: CORS_HEADERS,
+            body: JSON.stringify({ error: "API error", details: errorData.error?.message || 'Failed to fetch from API' }),
+        };
+    }
+
     const data = await response.json();
     const reply = data.choices?.[0]?.message?.content || "No response.";
 
     history.push({ role: "assistant", content: reply });
 
+    // *** THIS IS THE KEY FIX ***
+    // Add CORS_HEADERS to the successful response
     return {
       statusCode: 200,
+      headers: CORS_HEADERS, 
       body: JSON.stringify({ reply }),
     };
 
   } catch (err) {
     console.error("Error:", err);
+    // Add CORS_HEADERS to the catch-all error response
     return {
       statusCode: 500,
+      headers: CORS_HEADERS,
       body: JSON.stringify({ error: "Server error", details: err.message }),
     };
   }
