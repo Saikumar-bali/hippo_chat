@@ -31,12 +31,14 @@ exports.handler = async (event) => {
   // Get the Bot Token and Chat ID from Netlify environment variables
   const { TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID } = process.env;
 
+  // *** THIS IS THE MOST LIKELY CAUSE OF THE 500 ERROR ***
+  // You must set these variables in your Netlify project settings.
   if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
-    console.error('Telegram Bot Token or Chat ID is not set.');
+    console.error('Telegram Bot Token or Chat ID is not set in environment variables.');
     return {
       statusCode: 500,
       headers: CORS_HEADERS,
-      body: JSON.stringify({ error: 'Server configuration error.' })
+      body: JSON.stringify({ error: 'Server configuration error. Check environment variables.' })
     };
   }
 
@@ -48,20 +50,21 @@ exports.handler = async (event) => {
       return {
         statusCode: 400,
         headers: CORS_HEADERS,
-        body: JSON.stringify({ error: 'Missing required fields.' })
+        body: JSON.stringify({ error: 'Missing required fields (firstName, email, message).' })
       };
     }
 
     // Format the message for Telegram
     // Using MarkdownV2 for formatting. Note special chars must be escaped.
-    const format = (str) => str.replace(/([_*\[\]()~`>#+-=|{}.!])/g, '\\$1');
+    // *** UPDATED: Added (str || '') to prevent error if a value is null/undefined ***
+    const format = (str) => (str || '').replace(/([_*\[\]()~`>#+-=|{}.!])/g, '\\$1');
     
     let message = `*New Contact Form Submission* 🦛\n\n`;
-    message += `*Name:* ${format(data.firstName)} ${format(data.lastName || '')}\n`;
+    message += `*Name:* ${format(data.firstName)} ${format(data.lastName)}\n`; // No || '' needed here
     message += `*Email:* ${format(data.email)}\n`;
     
     if (data.phoneNumber) {
-      message += `*Phone:* ${format(data.countryCode || '')} ${format(data.phoneNumber)}\n`;
+      message += `*Phone:* ${format(data.countryCode)} ${format(data.phoneNumber)}\n`; // No || '' needed here
     }
     
     message += `*Message:*\n${format(data.message)}`;
@@ -86,7 +89,7 @@ exports.handler = async (event) => {
 
     if (!telegramResponse.ok) {
       console.error('Telegram API Error:', telegramResult);
-      throw new Error(telegramResult.description || 'Failed to send message to Telegram.');
+      throw new Error(`Telegram API Error: ${telegramResult.description}` || 'Failed to send message to Telegram.');
     }
 
     // Send success response to the frontend
