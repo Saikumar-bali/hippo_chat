@@ -4,3 +4,13 @@
 
 [functions]
   node_bundler = "esbuild"
+
+  [[redirects]]
+  from = "/admin-live-chat"
+  to = "/admin-live-chat.html"
+  status = 200
+
+  [[redirects]]
+  from = "/user-chat"
+  to = "/user-chat.html" 
+  status = 200

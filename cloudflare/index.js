@@ -83,7 +83,7 @@ export default {
         await env.CHAT_SESSIONS.put(sessionId, JSON.stringify(userInfo));
 
 // In the sendTelegramMessage calls, update the URL:
-    const telegramMsg = `🦛 New Live Chat Started\n\nUser: ${body.userName || 'Anonymous'}\nEmail: ${body.email || 'Not provided'}\nSession ID: ${sessionId}\n\nClick here to chat: https://your-netlify-site.netlify.app/admin-live-chat.html?session=${sessionId}`;
+const telegramMsg = `🦛 New Live Chat Started\n\nUser: ${body.userName || 'Anonymous'}\nEmail: ${body.email || 'Not provided'}\nSession ID: ${sessionId}\n\nClick here to chat: https://hippoclouds-chat-bot.netlify.app/admin-live-chat.html?session=${sessionId}`;        await sendTelegramMessage(env, telegramMsg);
         await sendTelegramMessage(env, telegramMsg);
 
         return new Response(JSON.stringify({
@@ -117,7 +117,7 @@ export default {
         await env.CHAT_SESSIONS.put(sessionId, JSON.stringify(session));
 
         if (sender === 'user') {
-          const telegramMsg = `💬 New Message in Live Chat\n\nSession: ${sessionId}\nUser: ${session.userName}\nMessage: ${message}\n\nReply: https://admin.hippoclouds.com/live-chat?session=${sessionId}`;
+          const telegramMsg = `💬 New Message in Live Chat\n\nSession: ${sessionId}\nUser: ${session.userName}\nMessage: ${message}\n\nReply: https://hippoclouds-chat-bot.netlify.app/admin-live-chat.html?session=${sessionId}`;
           await sendTelegramMessage(env, telegramMsg);
         }
 
