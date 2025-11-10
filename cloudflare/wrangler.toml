@@ -1,0 +1,11 @@
+name = "hippoclouds2025"
+main = "index.js"
+compatibility_date = "2025-11-06"
+
+[vars]
+TELEGRAM_BOT_TOKEN = "7032295741:AAHanNDBYitnzsHBo51q1qvKx5vR5Rp25ao"
+TELEGRAM_CHAT_ID = "-1003207996998"
+
+[[kv_namespaces]]
+binding = "CHAT_SESSIONS"
+id = "e87838d57e8849faafc608709c5c05be"

@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Chat with HippoClouds</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+        .chat-container { width: 100%; max-width: 400px; background: white; border-radius: 15px; box-shadow: 0 20px 40px rgba(0,0,0,0.1); overflow: hidden; }
+        .chat-header { background: #2c3e50; color: white; padding: 20px; text-align: center; }
+        .chat-messages { height: 400px; padding: 20px; overflow-y: auto; background: #fafafa; }
+        .message { max-width: 80%; margin-bottom: 15px; padding: 12px 16px; border-radius: 18px; }
+        .user-message { background: #dcf8c6; margin-left: auto; border-bottom-right-radius: 4px; }
+        .admin-message { background: #e3f2fd; margin-right: auto; border-bottom-left-radius: 4px; }
+        .message-time { font-size: 10px; color: #888; text-align: right; margin-top: 5px; }
+        .chat-input { padding: 20px; border-top: 1px solid #e9ecef; background: white; }
+        .input-group { display: flex; gap: 10px; }
+        #userMessageInput { flex: 1; padding: 12px 16px; border: 2px solid #e9ecef; border-radius: 25px; outline: none; }
+        #sendUserMessage { background: #2ecc71; color: white; border: none; padding: 12px 20px; border-radius: 25px; cursor: pointer; }
+        .status { text-align: center; padding: 10px; font-size: 12px; color: #7f8c8d; }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <h2>💬 Live Chat Support</h2>
+            <p>We're here to help you!</p>
+        </div>
+        <div class="chat-messages" id="userChatMessages">
+            <div class="status" id="statusMessage">Click "Start Chat" to begin</div>
+        </div>
+        <div class="chat-input">
+            <div class="input-group">
+                <input type="text" id="userMessageInput" placeholder="Type your message..." maxlength="500" disabled>
+                <button id="sendUserMessage" disabled>Send</button>
+            </div>
+            <button id="startChatBtn" style="width:100%; margin-top:10px; background:#3498db; color:white; border:none; padding:12px; border-radius:25px; cursor:pointer;">Start Chat</button>
+        </div>
+    </div>
+
+    <script>
+        class UserLiveChat {
+            constructor() {
+                this.sessionId = null;
+                this.pollInterval = null;
+                this.workerUrl = 'https://hippoclouds2025.saikumarbali555.workers.dev';
+                
+                this.initializeEventListeners();
+            }
+            
+            initializeEventListeners() {
+                document.getElementById('startChatBtn').addEventListener('click', () => {
+                    this.startNewChat();
+                });
+                
+                document.getElementById('sendUserMessage').addEventListener('click', () => {
+                    this.sendMessage();
+                });
+                
+                document.getElementById('userMessageInput').addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        this.sendMessage();
+                    }
+                });
+            }
+            
+            async startNewChat() {
+                const userName = prompt('Enter your name:', 'Test User');
+                const email = prompt('Enter your email (optional):', 'test@example.com');
+                
+                if (!userName) {
+                    alert('Name is required to start chat');
+                    return;
+                }
+                
+                try {
+                    document.getElementById('statusMessage').textContent = 'Starting chat...';
+                    
+                    const response = await fetch(`${this.workerUrl}/live-chat/start`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ userName, email: email || '' })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.sessionId) {
+                        this.sessionId = data.sessionId;
+                        document.getElementById('statusMessage').textContent = 'Connected to support! Admin will join shortly.';
+                        document.getElementById('userMessageInput').disabled = false;
+                        document.getElementById('sendUserMessage').disabled = false;
+                        document.getElementById('startChatBtn').style.display = 'none';
+                        this.startPolling();
+                        
+                        console.log('User Session ID:', this.sessionId);
+                        alert('Chat started! Session ID: ' + this.sessionId);
+                    }
+                } catch (error) {
+                    console.error('Error starting chat:', error);
+                    document.getElementById('statusMessage').textContent = 'Failed to connect. Please try again.';
+                }
+            }
+            
+            async sendMessage() {
+                if (!this.sessionId) return;
+                
+                const messageInput = document.getElementById('userMessageInput');
+                const message = messageInput.value.trim();
+                
+                if (!message) return;
+                
+                try {
+                    const response = await fetch(`${this.workerUrl}/live-chat/send`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            sessionId: this.sessionId,
+                            message: message,
+                            sender: 'user'
+                        })
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        messageInput.value = '';
+                        await this.loadMessages();
+                    }
+                } catch (error) {
+                    console.error('Error sending message:', error);
+                }
+            }
+            
+            async loadMessages() {
+                if (!this.sessionId) return;
+                
+                try {
+                    const response = await fetch(`${this.workerUrl}/live-chat/messages?sessionId=${this.sessionId}`);
+                    const data = await response.json();
+                    
+                    if (data.messages) {
+                        this.displayMessages(data.messages);
+                    }
+                } catch (error) {
+                    console.error('Error loading messages:', error);
+                }
+            }
+            
+            displayMessages(messages) {
+                const chatMessages = document.getElementById('userChatMessages');
+                
+                if (messages.length === 0) {
+                    return;
+                }
+                
+                chatMessages.innerHTML = messages.map(msg => `
+                    <div class="message ${msg.sender === 'user' ? 'user-message' : 'admin-message'}">
+                        <div class="message-content">${this.escapeHtml(msg.message)}</div>
+                        <div class="message-time">${new Date(msg.timestamp).toLocaleTimeString()} - ${msg.sender}</div>
+                    </div>
+                `).join('');
+                
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+                document.getElementById('statusMessage').style.display = 'none';
+            }
+            
+            startPolling() {
+                this.pollInterval = setInterval(() => {
+                    this.loadMessages();
+                }, 2000);
+                
+                this.loadMessages();
+            }
+            
+            escapeHtml(unsafe) {
+                return unsafe
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;")
+                    .replace(/'/g, "&#039;");
+            }
+        }
+        
+        const userChat = new UserLiveChat();
+    </script>
+</body>
+</html>
