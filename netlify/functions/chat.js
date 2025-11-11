@@ -42,6 +42,23 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS, GET'
 };
 
+// Helper to ensure history exists and is properly formatted
+function ensureHistory(session) {
+  global.chatHistory = global.chatHistory || {};
+  
+  if (!global.chatHistory[session] || 
+      !Array.isArray(global.chatHistory[session]) || 
+      global.chatHistory[session].length === 0 ||
+      global.chatHistory[session][0].role !== 'system') {
+    
+    global.chatHistory[session] = [
+      { role: "system", content: HIPPOCLOUDS_SYSTEM_PROMPT }
+    ];
+  }
+  
+  return global.chatHistory[session];
+}
+
 exports.handler = async (event, context) => {
 
   // Handle preflight OPTIONS request
@@ -57,7 +74,7 @@ exports.handler = async (event, context) => {
   if (event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
-      headers: CORS_HEADERS, // Add headers here too
+      headers: CORS_HEADERS,
       body: JSON.stringify({ error: 'Method not allowed' })
     };
   }
@@ -66,11 +83,11 @@ exports.handler = async (event, context) => {
     const body = JSON.parse(event.body || "{}");
     const message = body.message;
 
-    if (!message) {
+    if (!message || typeof message !== 'string') {
       return {
         statusCode: 400,
-        headers: CORS_HEADERS, // Add headers to error responses
-        body: JSON.stringify({ error: "message is required" }),
+        headers: CORS_HEADERS,
+        body: JSON.stringify({ error: "message is required and must be a string" }),
       };
     }
 
@@ -78,21 +95,15 @@ exports.handler = async (event, context) => {
       ? context.clientContext.user.sub
       : "public-user";
 
-    global.chatHistory = global.chatHistory || {};
-    global.chatHistory[session] = global.chatHistory[session] || [
-      { role: "system", content: HIPPOCLOUDS_SYSTEM_PROMPT }
-    ];
-
-    const history = global.chatHistory[session];
-    history.push({ role: "user", content: message });
+    // Use the improved history management
+    const history = ensureHistory(session);
+    history.push({ role: 'user', content: message });
 
     const payload = {
-      // *** THIS IS THE KEY FIX ***
-      // Changed model to Groq's standard Llama 3 70B, which is much better at following system prompts.
-      model: "llama3-70b-8192", 
+      model: "llama-3.3-70b-versatile",
       messages: history,
       max_tokens: 500,
-      temperature: 0.2
+      temperature: 0.15 // Using the same temperature as server.js for consistency
     };
 
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -105,7 +116,6 @@ exports.handler = async (event, context) => {
     });
 
     if (!response.ok) {
-        // Handle API errors
         const errorData = await response.json();
         console.error("Groq API Error:", errorData);
         return {
@@ -116,11 +126,17 @@ exports.handler = async (event, context) => {
     }
 
     const data = await response.json();
-    const reply = data.choices?.[0]?.message?.content || "No response.";
+    const reply = data.choices?.[0]?.message?.content || "Sorry, I could not generate a response.";
 
-    history.push({ role: "assistant", content: reply });
+    // Append assistant message to history
+    history.push({ role: 'assistant', content: reply });
 
-    // Add CORS_HEADERS to the successful response
+    // Keep session history length bounded to avoid long payloads (same as server.js)
+    if (history.length > 40) {
+      // Keep system prompt + last 30 messages
+      global.chatHistory[session] = [history[0]].concat(history.slice(-30));
+    }
+
     return {
       statusCode: 200,
       headers: CORS_HEADERS, 
@@ -129,7 +145,6 @@ exports.handler = async (event, context) => {
 
   } catch (err) {
     console.error("Error:", err);
-    // Add CORS_HEADERS to the catch-all error response
     return {
       statusCode: 500,
       headers: CORS_HEADERS,
