@@ -87,7 +87,9 @@ exports.handler = async (event, context) => {
     history.push({ role: "user", content: message });
 
     const payload = {
-      model: "llama-3.3-70b-versatile",
+      // *** THIS IS THE KEY FIX ***
+      // Changed model to Groq's standard Llama 3 70B, which is much better at following system prompts.
+      model: "llama3-70b-8192", 
       messages: history,
       max_tokens: 500,
       temperature: 0.2
@@ -118,7 +120,6 @@ exports.handler = async (event, context) => {
 
     history.push({ role: "assistant", content: reply });
 
-    // *** THIS IS THE KEY FIX ***
     // Add CORS_HEADERS to the successful response
     return {
       statusCode: 200,
